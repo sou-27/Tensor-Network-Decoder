@@ -8,7 +8,7 @@ import pytest
 
 
 def test_dem_depolar_has_no_time_like_errors():
-    """Verifies that DEM error mechanisms do not span multiple time slices and only target t=0."""
+    """Verifies that DEM error mechanisms do not span multiple time slices and only target t=0. Check for "depolarize" noise model."""
     code = SurfaceCode(code_distance=3, noise_model="depolarise", noise=0.01)
     dem = code.dem
 
@@ -37,7 +37,7 @@ def test_dem_depolar_has_no_time_like_errors():
 
 
 def test_dem_bitflip_has_no_time_like_errors():
-    """Verifies that DEM error mechanisms do not span multiple time slices and only target t=0."""
+    """Verifies that DEM error mechanisms do not span multiple time slices and only target t=0. Check for "bitflip" noise model"""
     code = SurfaceCode(code_distance=3, noise_model="bitflip", noise=0.01)
     dem = code.dem
 
