@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: TN_Decoder
+Version: 0.1.0
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: stim
+Requires-Dist: matplotlib
+Requires-Dist: ncon
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Dynamic: license-file
