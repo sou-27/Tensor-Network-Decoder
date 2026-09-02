@@ -1,6 +1,6 @@
 import numpy as np
 import stim
-import ncon
+from ncon import ncon
 import scipy.linalg as SA
 
 def qr(A):
@@ -25,6 +25,17 @@ def qr(A):
 
 
 def contract_network(code, error_chain, chi):
+    """
+    Constructs tensor network corresponding to given error chain and contracts it.
+
+    Parameters:
+    code (SurfaceCode object) : Contains information about the input surface code/
+    error_chain (list of tuples) : Coordinates of all data qubits at which the chosen error chain crosses.
+    chi (int) : Maximum bond dimension to be kept during contraction of the tensor network.
+
+    Returns:
+    prob(float): Result of contraction of the tensor network
+    """
 
     L = 2 * code.distance - 1
     S = code.S
@@ -65,7 +76,7 @@ def contract_network(code, error_chain, chi):
         else:
             next_layer.append(V)
 
-    state = initial_contract(state, next_layer, chi)
+    state = mps_mpo_contract(state, next_layer, chi)
 
     #Contract through inner layers of tensor network
 
@@ -102,7 +113,7 @@ def contract_network(code, error_chain, chi):
                 else:
                     next_layer.append(V)
 
-        state = contract_layers(state,next_layer, chi)
+        state = mps_mpo_contract(state,next_layer, chi)
 
     #Construct final layer
     next_layer = []
@@ -122,24 +133,54 @@ def contract_network(code, error_chain, chi):
         else:
             next_layer.append(S.sum(axis = 3))
 
-    prob = final_contract(state, next_layer)
+    prob = mps_mps_contract(state, next_layer, chi)
 
     return prob
 
 
-def initial_contract(mps, mpo, chi):
+def mps_mpo_contract(mps, mpo, chi):
 
+
+    L = len(mps)
+    for j in range(L):
+        A = mps[j]
+        B = mpo[j]
+        if j == 0:
+            mps[j] = ncon([A,B], [[-2,1],[-1,1,-3]]).reshape(B.shape[0] * A.shape[0], B.shape[2])
+        elif j == L-1:
+            mps[j] = ncon([A,B], [[-2,1], [1,-1,-3]]).reshape(B.shape[1] * A.shape[0], B.shape[2])
+        else:
+
+            mps[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3,-5]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1], B.shape[3])
+
+
+    #mps = truncate_mps(mps)
 
     return mps
 
 
-def contract_layers(mps, mpo, chi):
 
+def mps_mps_contract(mps1,mps2, chi):
 
-    return mps
+    L = len(mps1)
 
+    for j in range(L):
+        A = mps1[j]
+        B = mps2[j]
+        if j == 0:
+            mps1[j] = ncon([A,B], [[-2,1],[-1,1]]).reshape(B.shape[0] * A.shape[0])
+        elif j == L-1:
+            mps1[j] = ncon([A,B], [[-2,1], [1,-1]]).reshape(B.shape[1] * A.shape[0])
+        else:
 
-def final_contract(mps1,mps2):
-    overlap = 0
+            mps1[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1])
+
+    #mps1 = truncate_mps(mps1)
+
+    overlap = ncon([mps1[0], mps1[1]], [[1],[-1,1]])
+    for j in range(1,L-2):
+        overlap = ncon([overlap, mps1[j+1]], [[1], [-1,1]])
+
+    overlap = ncon([overlap, mps1[L-1]], [[1], [1]])
 
     return overlap
