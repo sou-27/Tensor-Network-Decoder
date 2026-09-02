@@ -13,9 +13,16 @@ class SurfaceCode:
         
         if self.noise_model not in ["depolarise", "depolarize", "bit_flip", "bitflip"]:
             raise ValueError("noise_model must be 'depolarise' or 'bit-flip'")
+        
             
         self.circuit = self._build_code_capacity_circuit()
         self.dem = self.circuit.detector_error_model(decompose_errors=True)
+        self.S = self.create_S()
+        self.H = self._create_H(error=False)
+        self.H_error = self._create_H(error=True)
+        self.V = self._create_V(error=False)
+        self.V_error = self._create_V(error=True)
+        
 
     def _build_code_capacity_circuit(self) -> stim.Circuit:
         d = self.code_distance
@@ -58,3 +65,93 @@ class SurfaceCode:
                     noisy_circuit.append("X_ERROR", data_qubits, p)
 
             return noisy_circuit
+
+    def model(self, operator):
+        """
+        Stores i.i.d probability dfistribution for pauli operators.
+
+        Parameters:
+        code(SurfaceCode object) : Input surface code
+        operator(Tuple of ints) : Encoding of which pauli operator appears (X,Z)
+
+        Returns:
+        p(float) : Probability of given operator according to noise model 
+        """
+        op = (operator[0] << 1) | operator[1]
+
+        if 'depolar' in self.noise_model:
+            model = {
+                0 : 1 - self.noise,
+                1 : self.noise/3,
+                2 : self.noise/3,
+                3 : self.noise/3
+            }
+        else:
+            model = {
+                0 : 1 - self.noise,
+                1 : 0,
+                2 : self.noise,
+                3 : 0
+            }
+
+        return model[op]
+
+    @staticmethod
+    def create_S():
+        """
+        Creates the rank-4 tensor S to be used in the tensor network.
+
+        Returns:
+        S (np.ndarray) : Required tensor
+        """
+
+        S = np.zeros(2**4).reshape(2,2,2,2)
+        for j in range(2):
+            S[j,j,j,j] = 1
+
+        return S
+
+    def _create_H(self,error):
+        """
+            Creates the rank-4 tensor H to be used in the tensor network.
+        
+            Returns:
+            H (np.ndarray) : Required tensor
+        """
+
+        H = np.zeros(2**4).reshape(2,2,2,2)
+
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    for l in range(2):
+                        op = [(j+l)%2, (i+k)%2]
+
+                        if error:
+                            op[1] = (op[1]+1)%2
+
+                    H[i,j,k,l] = self.model(op)
+
+        return H
+
+    def _create_V(self,error):
+        """
+                Creates the rank-4 tensor V to be used in the tensor network.
+            
+                Returns:
+                V (np.ndarray) : Required tensor
+            """
+        
+        V = np.zeros(2**4).reshape(2,2,2,2)
+        
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    for l in range(2):
+                        op = [(i+k)%2, (j+l)%2]
+
+                        if error:
+                            op[1] = (op[1]+1)%2
+
+                    V[i,j,k,l] = self.model(op)
+        return V
