@@ -22,6 +22,29 @@ def qr(A):
     return Q, R
 
 
+def trim_svd(A, chi):
+    """ Performs a truncated SVD for the matrix A.
+
+    Parameters
+    ----------
+    A : matrix, matrix to be decomposed.
+    chi : int, maximum bond dimension to be truncated to.
+
+    Returns
+    -------
+    U,s,V : matrices such that A = U @ s @ V. The matrix dimensions are appropriately truncated according to chi and stol.
+    """
+    U, s, V = SA.svd(A, full_matrices=False)
+
+
+    chitemp = min(chi, len(s))
+
+    U = U[:,:chitemp]
+    s = s[:chitemp]
+    V = V[:chitemp,:]
+
+    return U, s, V
+
 
 
 def contract_network(code, error_chain, chi):
@@ -139,7 +162,18 @@ def contract_network(code, error_chain, chi):
 
 
 def mps_mpo_contract(mps, mpo, chi):
-
+    """
+        Contracts an MPS and an MPO to return another MPS
+    
+        Parameters:
+        mps (list of ndarrays): MPS to be contracted 
+        mpo (list of ndarrays): MPO to be contracted
+        chi (int) : Maximum bond dimension to be truncated to after contraction
+    
+        Returns:
+        mps (list of ndarrays) : Result of the contraction mps|mpo
+        
+        """
 
     L = len(mps)
     for j in range(L):
@@ -154,14 +188,25 @@ def mps_mpo_contract(mps, mpo, chi):
             mps[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3,-5]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1], B.shape[3])
 
 
-    #mps = truncate_mps(mps)
+    #mps = truncate_mps(mps, chi)
 
     return mps
 
 
 
 def mps_mps_contract(mps1,mps2, chi):
+    """
+    Contracts two MPSs to return a number
 
+    Parameters:
+    mps1 (list of ndarrays): 1st MPS 
+    mps2 (list of ndarrays): 2nd MPS
+    chi (int) : Maximum bond dimension to be truncated to after contraction
+
+    Returns:
+    overlap(float) : Result of the contraction <mps1|mps2>
+    
+    """
     L = len(mps1)
 
     for j in range(L):
@@ -175,7 +220,7 @@ def mps_mps_contract(mps1,mps2, chi):
 
             mps1[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1])
 
-    #mps1 = truncate_mps(mps1)
+    #mps1 = truncate_mps(mps1, chi)
 
     overlap = ncon([mps1[0], mps1[1]], [[1],[-1,1]])
     for j in range(1,L-2):
@@ -184,3 +229,75 @@ def mps_mps_contract(mps1,mps2, chi):
     overlap = ncon([overlap, mps1[L-1]], [[1], [1]])
 
     return overlap
+
+def left_canonical_mps(mps):
+    """
+    Left canonicalizes input mps vis successive QR decompositions.
+
+    Parameters:
+    mps (list of tensors) : MPS to be canonicalized.
+
+    Returns:
+    mps (list of tensors) : MPS after canonicalization.
+    R (float) : Normalization after canonicalization
+    
+    """
+
+
+    L = len(mps)
+    new_mps = []
+
+    Q,R = qr(mps[-1].T)
+    new_mps.insert(0,Q.T)
+
+
+    for j in range(-2,-(L),-1):
+        tensor_now = ncon([R, mps[j]], [[-1,1], [1,-3,-2]])
+
+        Q, R = qr(tensor_now.reshape(tensor_now.shape[0] * tensor_now.shape[1], tensor_now.shape[2]))
+        new_tensor = np.transpose(Q.reshape(tensor_now.shape[0], tensor_now.shape[1], -1), axes = (0, 2, 1))
+
+        new_mps.insert(0, new_tensor)
+
+    tensor_now = ncon([R, mps[-L]], [[-1,1], [1,-2]])
+    Q, R = qr(tensor_now)
+
+    new_mps.insert(0, Q)
+
+    return new_mps, R
+
+def truncate_mps(mps, chi):
+
+
+    mps, R = left_canonical_mps(mps)
+    new_mps = []
+
+    L = len(mps)
+
+    U, s, V = trim_svd(mps[0], chi)
+    new_mps.append(V)
+
+
+    for j in range(1,L-1):
+        mps[j] = ncon([mps[j], U, np.diag(s)], [[-1,1,-3], [1,2], [2,-2]])
+        shape = mps[j].shape
+        U, s, V = trim_svd(mps[j].reshape(shape[0], shape[2] * shape[1]), chi)
+
+        new_mps.append(V.reshape(len(s), -1, shape[2]))
+
+    new_mps.append(ncon([mps[L-1], U, np.diag(s)], [[1,-2], [1,2], [2,-1]]))
+
+    if isinstance(R, np.ndarray) and R.ndim == 2:
+        new_mps[0] = ncon([new_mps[0], R], [[-1,1], [1,-2]])
+    else:
+        new_mps[0] = new_mps[0] * R
+    
+
+    return new_mps
+
+
+
+    
+
+
+

@@ -4,6 +4,28 @@ import pytest
 from src.tensor_network_utils import *
 
 
+def mps_to_vector(mps):
+    """Contracts an MPS into a dense state vector for verification."""
+    L = len(mps) 
+    res = ncon([mps[0],mps[1]], [[1,-3], [-1,1,-2]])
+    for j in range(2,L-1):
+        res = ncon([mps[j], res], [[-1,1,-2], [1, *[-k for k in range(3,j+3)]]])
+
+    res = ncon([mps[L-1], res], [[1,-1], [1, *[-k for k in range(2,L+1)]]])
+    return res.flatten()
+    
+
+def create_random_mps(N,d,chi_mps):
+    mps = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps.append(np.random.randn(*shape))
+        return mps
 
 def test_mps_mpo_contraction():
     """
@@ -107,4 +129,167 @@ def test_mps_mps_contraction():
         f"Contracted value {val} is not a recognized numerical type"
     )
     assert np.isfinite(val), f"Contraction result is non-finite: {val}"
+
+
+def test_left_canonical():
+
+
+    N = 4        # Number of sites
+    d = 2        # Physical dimension
+    chi_mps = 3  # Input MPS bond dimension
+    chi_mpo = 2  # Input MPO bond dimension
+    chi_max = 5  # Max truncation bond dimension
+
+
+    # Synthetic input MPS: tensors of shape (left_bond, phys_dim, right_bond)
+    mps = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps.append(np.random.randn(*shape))
+
+    new_mps, R = left_canonical_mps(mps)
+
+
+    assert len(mps) == len(new_mps), f"Length of output MPS does not match length of input MPS"
+
+    # Dense vector of original MPS
+    vec_orig = mps_to_vector(mps)
+
+    for i, A in enumerate(new_mps):
+        if i == 0:
+            identity_check = ncon([A, np.conj(A)], [[1,-2],[1,-1]])
+            expected_identity = np.eye(A.shape[1])
+        elif i == N-1:
+            continue
+        else:
+            u_bond, d_bond, r_bond = A.shape
+            # Reshape to matrix M of shape (left_bond * phys_dim, right_bond)
+            M = np.transpose(A, axes = (0,2,1)).reshape(u_bond * r_bond, d_bond)
+
+            identity_check = M.conj().T @ M
+            expected_identity = np.eye(d_bond)
+
+        np.testing.assert_allclose(
+            identity_check,
+            expected_identity,
+            atol=1e-12,
+            err_msg=f"Left-canonical isometry condition failed at site {i}",
+        )
+
+        # 4. Test Property 2: State vector equality after combining canonical_mps and R
+    mps_reconstructed = [t.copy() for t in new_mps]
+
+    # Contract R into the last tensor's right bond
+    if isinstance(R, np.ndarray) and R.ndim == 2:
+        mps_reconstructed[0] = ncon([mps_reconstructed[0], R], [[-1,1], [1,-2]])
+    else:
+        mps_reconstructed[0] = mps_reconstructed[0] * R
+
+    vec_canonical = mps_to_vector(mps_reconstructed)
+
+
+    np.testing.assert_allclose(
+        vec_canonical,
+        vec_orig,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Reconstructed state vector does not match original MPS",
+    )
+
+def test_svd_truncation():
+
+
+    N = 4        # Number of sites
+    d = 2        # Physical dimension
+    chi_mps = 5  # Input MPS bond dimension
+    chi_max = 3  # Max truncation bond dimension
+
+
+    # Synthetic input MPS: tensors of shape (left_bond, phys_dim, right_bond)
+    mps = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps.append(np.random.randn(*shape))
+
+    new_mps = truncate_mps(mps, chi_max)
+    vec = mps_to_vector(new_mps)
+
+    assert len(mps) == len(new_mps), f"Length of truncated MPS does not match length input MPS"
+
+    for j in range(N):
+
+        shape = new_mps[j].shape
+
+        assert all(x <= chi_max for x in shape), f"Bond dimension above chi_max at site {j}"
+
+
     
+def test_truncate_mps_exact_when_chi_large():
+    """
+    Verifies that truncating with chi_max >= current_chi is exact 
+    and preserves the state vector up to numerical precision.
+    """
+    N, d, chi_mps, chi_max = 4, 2, 3, 10
+    mps = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps.append(np.random.randn(*shape))
+
+    vec_orig = mps_to_vector(mps)
+    
+    # Truncate with an oversized chi_max (no actual singular values removed)
+    truncated_mps = truncate_mps(mps, chi=chi_max)
+    vec_truncated = mps_to_vector(truncated_mps)
+
+    np.testing.assert_allclose(
+        vec_truncated,
+        vec_orig,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Loss of fidelity occurred when chi_max was larger than initial bond dimension",
+    )
+
+
+def test_truncate_mps_fidelity_bound():
+    """
+    Verifies that truncating a state yields a valid state vector 
+    whose overlap with the original state satisfies 0 < |<psi_trunc|psi_orig>|^2 <= 1.
+    """
+    N, d, chi_mps, chi_max = 5, 2, 6, 2
+    mps = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps.append(np.random.randn(*shape))
+    vec_orig = mps_to_vector(mps)
+    
+    truncated_mps = truncate_mps(mps, chi=chi_max)
+    vec_truncated = mps_to_vector(truncated_mps)
+
+    # Compute inner product / normalized overlap
+    norm_orig = np.linalg.norm(vec_orig)
+    norm_trunc = np.linalg.norm(vec_truncated)
+    
+    assert norm_trunc > 0, "Truncated state vector norm is zero"
+    
+    overlap = np.abs(np.vdot(vec_truncated, vec_orig)) / (norm_orig * norm_trunc)
+    assert 0.0 < overlap <= 1.0 + 1e-12, f"Invalid overlap value: {overlap}"
