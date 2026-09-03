@@ -188,7 +188,7 @@ def mps_mpo_contract(mps, mpo, chi):
             mps[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3,-5]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1], B.shape[3])
 
 
-    #mps = truncate_mps(mps, chi)
+    mps = truncate_mps(mps, chi)
 
     return mps
 
@@ -220,7 +220,6 @@ def mps_mps_contract(mps1,mps2, chi):
 
             mps1[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1])
 
-    #mps1 = truncate_mps(mps1, chi)
 
     overlap = ncon([mps1[0], mps1[1]], [[1],[-1,1]])
     for j in range(1,L-2):
@@ -238,7 +237,7 @@ def left_canonical_mps(mps):
     mps (list of tensors) : MPS to be canonicalized.
 
     Returns:
-    mps (list of tensors) : MPS after canonicalization.
+    new_mps (list of tensors) : MPS after canonicalization.
     R (float) : Normalization after canonicalization
     
     """
@@ -267,7 +266,16 @@ def left_canonical_mps(mps):
     return new_mps, R
 
 def truncate_mps(mps, chi):
+    """
+    Performs SVD truncation of input MPS.
 
+    Parameters:
+    mps (list of tensors) : Input MPS
+    chi (int) : Maximum bond dimension to be kept after truncation.
+
+    Returns:
+    new_mps (list of tensors) : New MPS obtained after truncation.
+    """
 
     mps, R = left_canonical_mps(mps)
     new_mps = []

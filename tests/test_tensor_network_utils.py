@@ -202,7 +202,9 @@ def test_left_canonical():
     )
 
 def test_svd_truncation():
-
+    """
+    Verifies svd truncation structurally. Checks if bond dimensions are correctly truncated.
+    """
 
     N = 4        # Number of sites
     d = 2        # Physical dimension
