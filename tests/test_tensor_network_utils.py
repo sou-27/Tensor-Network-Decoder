@@ -13,21 +13,16 @@ def mps_to_vector(mps):
 
     res = ncon([mps[L-1], res], [[1,-1], [1, *[-k for k in range(2,L+1)]]])
     return res.flatten()
-    
 
-def create_random_mps(N,d,chi_mps):
-    mps = []
-    for i in range(N):
-        if i == 0:
-            shape = (chi_mps,d)
-        elif i == N-1:
-            shape = (chi_mps, d)
-        else:
-            shape = (chi_mps,chi_mps,d)
-        mps.append(np.random.randn(*shape))
-        return mps
+def mpo_to_matrix(mpo):
+    #Hardcoded for N = 4, d = 2
 
-def test_mps_mpo_contraction():
+    L = len(mpo)
+
+    result = ncon([mpo[0],mpo[1],mpo[2],mpo[3]], [[1,-4,-8], [2,-3,1,-7], [3,-2,2,-6], [-1,3,-5]]).reshape(2**4,2**4)
+    return result
+
+def test_mps_mpo_contraction_structure():
     """
     Verifies if mps-mpo contraction returns another mps of correct dimension
     """
@@ -81,9 +76,54 @@ def test_mps_mpo_contraction():
                 assert tensor.shape[0] == result_mps[i+1].shape[1], f"Bond dimensions mismatch in resulting MPS"
             if i == N-2:
                 assert tensor.shape[0] == result_mps[i+1].shape[0], f"Bond dimensions mismatch in resulting MPS"
-        
 
-def test_mps_mps_contraction():
+def test_mps_mpo_contraction_result():
+    """
+    Verifies if mps-mpo contraction returns another mps of correct dimension
+    """
+
+    N = 4        # Number of sites
+    d = 2        # Physical dimension
+    chi_mps = 3  # Input MPS bond dimension
+    chi_mpo = 2  # Input MPO bond dimension
+    chi_max = 5  # Max truncation bond dimension
+
+    # Synthetic input MPS: tensors of shape (left_bond, phys_dim, right_bond)
+    mps = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps.append(np.random.randn(*shape))
+
+    vec = mps_to_vector(mps)
+
+    # Synthetic input MPO: tensors of shape (left_bond, phys_out, right_bond, phys_in)
+    mpo = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mpo,d,d)
+        elif i == N-1:
+            shape = (d, chi_mpo, d)
+        else:
+            shape = (chi_mpo,d,chi_mpo,d)
+        mpo.append(np.random.randn(*shape))
+
+    mat = mpo_to_matrix(mpo)
+
+    # Execute function under test
+    result_mps = mps_mpo_contract(mps, mpo, chi_max)
+    result_vec = mps_to_vector(result_mps)
+
+    direct_result = vec@mat
+
+    assert np.allclose(direct_result, result_vec), f"MPO-MPS contraction does not agree"
+
+    
+def test_mps_mps_contraction_structure():
     """
     Verifies if mps-mps contraction returns a number
     """
@@ -129,6 +169,51 @@ def test_mps_mps_contraction():
         f"Contracted value {val} is not a recognized numerical type"
     )
     assert np.isfinite(val), f"Contraction result is non-finite: {val}"
+
+
+def test_mps_mps_contraction_result():
+    N = 4        # Number of sites
+    d = 2        # Physical dimension
+    chi_mps = 3  # Input MPS bond dimension
+    chi_max = 5  # Max truncation bond dimension
+
+    # Synthetic input MPS: tensors of shape (left_bond, phys_dim, right_bond)
+    mps1 = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps,d)
+        elif i == N-1:
+            shape = (chi_mps, d)
+        else:
+            shape = (chi_mps,chi_mps,d)
+        mps1.append(np.random.randn(*shape))
+
+    # Synthetic input MPO: tensors of shape (left_bond, phys_out, right_bond, phys_in)
+    mps2 = []
+    for i in range(N):
+        if i == 0:
+            shape = (chi_mps, d)
+        elif i == N-1:
+            shape = (d,chi_mps)
+        else:
+            shape = (chi_mps,d,chi_mps)
+        mps2.append(np.random.randn(*shape))
+
+    vec1 = mps_to_vector(mps1)
+
+    # Execute function under test
+    
+    result = mps_mps_contract(mps1, mps2, chi_max)
+
+    mps2[N-1] = mps2[N-1].T
+    for j in range(1,N-1):
+        mps2[j] = np.transpose(mps2[j], axes = (0,2,1))
+
+    vec2 = mps_to_vector(mps2)
+
+    vec_result = vec1.dot(vec2)
+
+    assert np.allclose(result, vec_result), f"Expected result = {vec_result}, got {result}"
 
 
 def test_left_canonical():

@@ -20,7 +20,7 @@ def get_active_detector_coordinates(
     
     for det_id, fired in enumerate(detection_event):
         if fired:
-            coords = dem.get_detector_coordinates(det_id)
+            coords = dem.get_detector_coordinates(det_id)[det_id]
             # Filter for spatial 2D detectors at time slice t=0
             if len(coords) >= 3 and coords[2] == 0:
                 active_coords.append((float(coords[0]), float(coords[1])))
@@ -45,8 +45,8 @@ def get_error_chain(
     error_chain : Set[Tuple[float, float]] = set()
 
     for (det_x,det_y) in active_detectors:
-        for i in range(0,det_y,2):  
-            path = (det_x, i)
+        for i in range(0,int(det_y),2):  
+            path = (int(det_x), i)
             error_chain.symmetric_difference_update({path})
 
     return list(error_chain)

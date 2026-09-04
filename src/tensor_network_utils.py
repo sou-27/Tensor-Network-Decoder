@@ -60,7 +60,7 @@ def contract_network(code, error_chain, chi):
     prob(float): Result of contraction of the tensor network
     """
 
-    L = 2 * code.distance - 1
+    L = 2 * code.code_distance - 1
     S = code.S
     H = code.H
     H_error = code.H_error
@@ -180,15 +180,15 @@ def mps_mpo_contract(mps, mpo, chi):
         A = mps[j]
         B = mpo[j]
         if j == 0:
-            mps[j] = ncon([A,B], [[-2,1],[-1,1,-3]]).reshape(B.shape[0] * A.shape[0], B.shape[2])
+            mps[j] = ncon([A,B], [[-1,1],[-2,1,-3]]).reshape(A.shape[0] * B.shape[0], B.shape[2])
         elif j == L-1:
-            mps[j] = ncon([A,B], [[-2,1], [1,-1,-3]]).reshape(B.shape[1] * A.shape[0], B.shape[2])
+            mps[j] = ncon([A,B], [[-1,1], [1,-2,-3]]).reshape(A.shape[0] * B.shape[1], B.shape[2])
         else:
 
-            mps[j] = ncon([A, B], [[-2,-4,1], [-1,1,-3,-5]]).reshape(B.shape[0] * A.shape[0], B.shape[2] * A.shape[1], B.shape[3])
+            mps[j] = ncon([A, B], [[-1,-3,1], [-2,1,-4,-5]]).reshape(A.shape[0] * B.shape[0], A.shape[1] * B.shape[2], B.shape[3])
 
 
-    mps = truncate_mps(mps, chi)
+    #mps = truncate_mps(mps, chi)
 
     return mps
 
@@ -207,6 +207,7 @@ def mps_mps_contract(mps1,mps2, chi):
     overlap(float) : Result of the contraction <mps1|mps2>
     
     """
+
     L = len(mps1)
 
     for j in range(L):
@@ -226,6 +227,8 @@ def mps_mps_contract(mps1,mps2, chi):
         overlap = ncon([overlap, mps1[j+1]], [[1], [-1,1]])
 
     overlap = ncon([overlap, mps1[L-1]], [[1], [1]])
+
+
 
     return overlap
 

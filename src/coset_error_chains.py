@@ -13,7 +13,7 @@ def X_coset_error_chain(code, error_chain):
     X_error_chain (List[Tuple(int,int)]) : List containing original error chain and a logical X-error
     
     """
-    d = code.distance
+    d = code.code_distance
 
     X_path = [(2*d - 2, k) for k in range(0,(2*d - 1), 2)]
 
@@ -35,7 +35,7 @@ def Z_coset_error_chain(code, error_chain):
         
         """
 
-    d = code.distance
+    d = code.code_distance
 
     Z_path = [(k, 2*d - 2) for k in range (0, (2*d - 1), 2)]
 

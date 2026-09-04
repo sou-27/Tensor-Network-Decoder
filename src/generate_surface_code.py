@@ -66,7 +66,7 @@ class SurfaceCode:
 
             return noisy_circuit
 
-    def model(self, operator):
+    def model(self, op):
         """
         Stores i.i.d probability dfistribution for pauli operators.
 
@@ -77,21 +77,21 @@ class SurfaceCode:
         Returns:
         p(float) : Probability of given operator according to noise model 
         """
-        op = (operator[0] << 1) | operator[1]
+
 
         if 'depolar' in self.noise_model:
             model = {
-                0 : 1 - self.noise,
-                1 : self.noise/3,
-                2 : self.noise/3,
-                3 : self.noise/3
+                (0,0) : 1 - self.noise,
+                (1,0) : self.noise/3,
+                (0,1) : self.noise/3,
+                (1,1) : self.noise/3
             }
         else:
             model = {
-                0 : 1 - self.noise,
-                1 : 0,
-                2 : self.noise,
-                3 : 0
+                (0,0) : 1 - self.noise,
+                (1,0) : self.noise,
+                (0,1) : 0,
+                (1,1) : 0
             }
 
         return model[op]
@@ -125,12 +125,13 @@ class SurfaceCode:
             for j in range(2):
                 for k in range(2):
                     for l in range(2):
-                        op = [(j+l)%2, (i+k)%2]
+                        op = ((j+l)%2, (i+k)%2)
 
                         if error:
-                            op[1] = (op[1]+1)%2
+                            op = ((j+l+1)%2, (i+k)%2)
 
-                    H[i,j,k,l] = self.model(op)
+                    
+                        H[i,j,k,l] = self.model(op)
 
         return H
 
@@ -148,10 +149,10 @@ class SurfaceCode:
             for j in range(2):
                 for k in range(2):
                     for l in range(2):
-                        op = [(i+k)%2, (j+l)%2]
+                        op = ((i+k)%2, (j+l)%2)
 
                         if error:
-                            op[1] = (op[1]+1)%2
+                            op = ((i+k)%2, (j+l+1)%2)
 
-                    V[i,j,k,l] = self.model(op)
+                        V[i,j,k,l] = self.model(op)
         return V
