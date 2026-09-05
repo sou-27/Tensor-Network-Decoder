@@ -1,6 +1,6 @@
 import stim
 import numpy as np
-from .parse_syndrome import get_active_detector_coordinates, get_error_chain
+from .parse_syndrome import get_active_detector_coordinates, get_error_chain, get_logical_bitflips
 from .tensor_network_utils import contract_network
 from .coset_error_chains import X_coset_error_chain, Y_coset_error_chain, Z_coset_error_chain
 
@@ -44,9 +44,17 @@ def decoder(code, detection_events, chi):
 
     flip_prob = prob_X + prob_Y
 
-    #print("I probability = ", prob_I)
-    #print("X probability = ", prob_X)
+    flip_prediction = flip_prob > noflip_prob
 
-    return flip_prob > noflip_prob
+    logical_bit_flip = get_logical_bitflips(error_chain)
+
+
+    #print(f"Cosit I = {prob_I}")
+    #print(f"Cosit X = {prob_X}")
+    #print(f"Cosit Y = {prob_Y}")
+    #print(f"Cosit Z = {prob_Z}")
+
+
+    return flip_prediction ^ logical_bit_flip
 
 

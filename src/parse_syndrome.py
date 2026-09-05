@@ -28,8 +28,7 @@ def get_active_detector_coordinates(
     return active_coords
 
 def get_error_chain(
-        active_detectors: List[Tuple[float, float]],
-) -> List[Tuple[float,float]]:
+        active_detectors: List[Tuple[float, float]],) :
 
     """
     Returns possible error chain given syndrome : active_detectors. We deterministically choose to join all defects to the lower (smooth) boundary.
@@ -38,7 +37,8 @@ def get_error_chain(
         active_detectors (list of tuple): List of (x,y) spatial coordinates of triggered detectors.
     
     Returns:
-        error_chain (set of tuples) : List of (x,y) spatial coordinates of data qubits lying in the path of the chosen error chain.
+        error_chain (set of tuples) : List of (x,y,p). (x,y) is spatial coordinate of qubit lying in error chain. p is type of pauli-error. In this experiment 
+                                      we only have bit-flip errors so p=0. We use p=0,1,2 = {X,Z,Y} respectively.
     
     """
 
@@ -46,7 +46,14 @@ def get_error_chain(
 
     for (det_x,det_y) in active_detectors:
         for i in range(0,int(det_y),2):  
-            path = (int(det_x), i)
+            path = (int(det_x), i, 0)
             error_chain.symmetric_difference_update({path})
 
     return list(error_chain)
+
+
+def get_logical_bitflips(error_chain):
+    num = sum(1 for x, y, p in error_chain if y == 0)
+
+    return num%2
+

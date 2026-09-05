@@ -18,10 +18,12 @@ class SurfaceCode:
         self.circuit = self._build_code_capacity_circuit()
         self.dem = self.circuit.detector_error_model(decompose_errors=True)
         self.S = self.create_S()
-        self.H = self._create_H(error=False)
-        self.H_error = self._create_H(error=True)
-        self.V = self._create_V(error=False)
-        self.V_error = self._create_V(error=True)
+        self.H = self._create_H(error=(0,0))
+        self.H_X = self._create_H(error=(1,0))
+        self.H_Y = self._create_H(error=(1,1))
+        self.H_Z = self._create_H(error=(0,1))
+        self.V = self._create_V(error=(0,0))
+
         
 
     def _build_code_capacity_circuit(self) -> stim.Circuit:
@@ -81,10 +83,10 @@ class SurfaceCode:
 
         if 'depolar' in self.noise_model:
             model = {
-                (0,0) : 1 - self.noise,
+                (0,0) : 1 - 2*self.noise/3,
                 (1,0) : self.noise/3,
-                (0,1) : self.noise/3,
-                (1,1) : self.noise/3
+                (0,1) : 0,
+                (1,1) : 0
             }
         else:
             model = {
@@ -125,12 +127,8 @@ class SurfaceCode:
             for j in range(2):
                 for k in range(2):
                     for l in range(2):
-                        op = ((j+l)%2, (i+k)%2)
+                        op = ((j+l+error[0])%2, (i+k+error[1])%2)
 
-                        if error:
-                            op = ((j+l+1)%2, (i+k)%2)
-
-                    
                         H[i,j,k,l] = self.model(op)
 
         return H
@@ -149,10 +147,7 @@ class SurfaceCode:
             for j in range(2):
                 for k in range(2):
                     for l in range(2):
-                        op = ((i+k)%2, (j+l)%2)
-
-                        if error:
-                            op = ((i+k)%2, (j+l+1)%2)
+                        op = ((i+k+error[0])%2, (j+l+error[1])%2)
 
                         V[i,j,k,l] = self.model(op)
         return V

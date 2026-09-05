@@ -47,7 +47,7 @@ def trim_svd(A, chi):
 
 
 
-def contract_network(code, error_chain, chi):
+def contract_network(code, error_chain, chi, show_network = False):
     """
     Constructs tensor network corresponding to given error chain and contracts it.
 
@@ -63,19 +63,36 @@ def contract_network(code, error_chain, chi):
     L = 2 * code.code_distance - 1
     S = code.S
     H = code.H
-    H_error = code.H_error
+    H_X = code.H_X
+    H_Y = code.H_Y
+    H_Z = code.H_Z
+
+    H_err = {
+        0 : H,
+        1 : H_X,
+        2 : H_Z,
+        3 : H_Y
+    }
+
+    H_err_str = {
+        0 : "H",
+        1 : "Hx",
+        2 : "Hz",
+        3 : "Hy"
+    }
+
     V = code.V
-    V_error = code.V_error
+
+    network = np.full((L,L), "", dtype = "<U10")
+    error_coordinates = [(err[0], err[1]) for err in error_chain]
 
     #Create initial MPS or first layer of tensor network
     state = []
     for j in range(L):
         if j%2 == 0:
-            if (0,j) in error_chain:
-                tensor = H_error
-            else:
-                tensor = H
-
+            idx = coordinate_in_error_chain((0,j), error_chain, error_coordinates)
+            network[0,j] = H_err_str[idx]
+            tensor = H_err[idx]
             if j == 0:
                 state.append(tensor[:,0,0,:])
             elif j == L-1:
@@ -84,36 +101,20 @@ def contract_network(code, error_chain, chi):
                 state.append(tensor[:,0,:,:])
         
         else:
+            network[0,j] = "S"
             state.append(S.sum(axis = 1))
-
-    #Create 2nd layer
-    next_layer = []
-    for j in range(L):
-        if j%2 == 0:
-            if j==0:
-                next_layer.append(S.sum(axis = 2))
-            elif j == L-1:
-                next_layer.append(S.sum(axis = 0))
-            else:
-                next_layer.append(S)
-        else:
-            next_layer.append(V)
-
-    state = mps_mpo_contract(state, next_layer, chi)
 
     #Contract through inner layers of tensor network
 
-    for i in range(1,L-2):
+    for i in range(1,L-1):
         next_layer = []
-        if (i+1)%2 == 0:
+        if i%2 == 0:
             #H-layer
             for j in range(L):
                 if j%2 == 0:
-                    if (i,j) in error_chain:
-                        tensor = H_error
-                    else:
-                        tensor = H
-
+                    idx = coordinate_in_error_chain((i,j), error_chain, error_coordinates)
+                    network[i,j] = H_err_str[idx]
+                    tensor = H_err[idx]
                     if j == 0:
                         next_layer.append(tensor[:,:,0,:])
                     elif j == L-1:
@@ -121,32 +122,36 @@ def contract_network(code, error_chain, chi):
                     else:
                         next_layer.append(tensor)
                 else:
+                    network[i,j] = "S"
                     next_layer.append(S)
 
         else:
             # V-layer (cannot contain error chain)
             for j in range(L):
                 if j%2 == 0:
+                    network[i,j] = "S"
                     if j==0:
                         next_layer.append(S.sum(axis = 2))
+
                     elif j == L-1:
                         next_layer.append(S.sum(axis = 0))
+
                     else:
                         next_layer.append(S)
                 else:
+                    network[i,j] = "V"
                     next_layer.append(V)
 
         state = mps_mpo_contract(state,next_layer, chi)
+
 
     #Construct final layer
     next_layer = []
     for j in range(L):
         if j % 2 == 0:
-            if (L-1,j) in error_chain:
-                tensor = H_error
-            else:
-                tensor = H
-
+            idx = coordinate_in_error_chain((L-1,j), error_chain, error_coordinates)
+            network[L-1,j] = H_err_str[idx]
+            tensor = H_err[idx]
             if j == 0:
                 next_layer.append(tensor[:,:,0,0])
             elif j == L-1:
@@ -154,11 +159,24 @@ def contract_network(code, error_chain, chi):
             else:
                 next_layer.append(tensor[:,:,:,0])
         else:
+            network[L-1,j] = "S"
             next_layer.append(S.sum(axis = 3))
 
     prob = mps_mps_contract(state, next_layer, chi)
 
-    return prob
+    if show_network:
+        return prob, network
+    else:
+        return prob
+
+
+def coordinate_in_error_chain(coord, error_chain, error_coordinates):
+
+    if coord in error_coordinates:
+        idx = error_coordinates.index(coord)
+        return error_chain[idx][2] + 1
+    else:
+        return 0
 
 
 def mps_mpo_contract(mps, mpo, chi):
@@ -188,7 +206,7 @@ def mps_mpo_contract(mps, mpo, chi):
             mps[j] = ncon([A, B], [[-1,-3,1], [-2,1,-4,-5]]).reshape(A.shape[0] * B.shape[0], A.shape[1] * B.shape[2], B.shape[3])
 
 
-    #mps = truncate_mps(mps, chi)
+    mps = truncate_mps(mps, chi)
 
     return mps
 

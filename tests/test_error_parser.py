@@ -14,7 +14,7 @@ from src.parse_syndrome import *
 def test_error_chain_in_horizontal_qubits():
 
 
-    code = SurfaceCode(code_distance=3, noise_model="depolarise", noise=0.01)
+    code = SurfaceCode(code_distance=3, noise_model="depolarise", noise=0.1)
     circuit = code.circuit
     dem = code.dem
 
@@ -44,12 +44,14 @@ def test_error_chain_in_horizontal_qubits():
     detection_events, _ = sampler.sample(shots = 10, separate_observables=True)
 
 
+
     for event in detection_events:
         active_detector_coords = get_active_detector_coordinates(event, dem)
         error_chain = get_error_chain(active_detector_coords)
 
+        error_coords = [(int(err[0]), int(err[1])) for err in error_chain]
         assert(
-            set(error_chain).issubset(set(horizontal_qubits))
+            set(error_coords).issubset(set(horizontal_qubits))
             ),f"error chain not contained in horizontal qubits"
 
 
