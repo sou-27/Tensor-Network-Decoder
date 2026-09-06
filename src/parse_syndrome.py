@@ -1,6 +1,5 @@
-import numpy as np
 import stim
-from typing import Dict, List, Tuple, Set
+from typing import List, Tuple
 
 def get_active_detector_coordinates(
     detection_event: List[bool], 
@@ -42,7 +41,7 @@ def get_error_chain(
     
     """
 
-    error_chain : Set[Tuple[float, float]] = set()
+    error_chain = set()
 
     for (det_x,det_y) in active_detectors:
         for i in range(0,int(det_y),2):  
@@ -53,6 +52,14 @@ def get_error_chain(
 
 
 def get_logical_bitflips(error_chain):
+    """
+    Counts number of times chosen error chain crosses the L0 observable of the circuit. For stim's unrotated surface code, memory-z experiment
+    we know that L0 lies along the bottom row of data qubits. Given our convention of joining error chains to the bottom boundary, the required count
+    is simply the number of data qubits in our error chain lying on the x-axis.
+
+    Returns:
+    (int) :  (# of times error chain crosses L0) modulo 2
+    """
     num = sum(1 for x, y, p in error_chain if y == 0)
 
     return num%2

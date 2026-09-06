@@ -49,12 +49,6 @@ def decoder(code, detection_events, chi):
     logical_bit_flip = get_logical_bitflips(error_chain)
 
 
-    #print(f"Cosit I = {prob_I}")
-    #print(f"Cosit X = {prob_X}")
-    #print(f"Cosit Y = {prob_Y}")
-    #print(f"Cosit Z = {prob_Z}")
-
-
     return flip_prediction ^ logical_bit_flip
 
 

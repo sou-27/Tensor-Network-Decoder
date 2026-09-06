@@ -1,7 +1,11 @@
 import numpy as np
-import stim
 from ncon import ncon
 import scipy.linalg as SA
+
+"""
+Throughout this work, we use the index ordering convention (up,left,down,right) for the tensors. If one or more of the indices are absent,
+the indices are still ordered in the counter-clockwise manner, starting from the index closest to "up".
+"""
 
 def qr(A):
     """ Performs a QR decomposition of the matrix A. The inbuilt qr module of numpy does not return a unique decomposition. This module fixes the gauge.
@@ -55,9 +59,11 @@ def contract_network(code, error_chain, chi, show_network = False):
     code (SurfaceCode object) : Contains information about the input surface code/
     error_chain (list of tuples) : Coordinates of all data qubits at which the chosen error chain crosses.
     chi (int) : Maximum bond dimension to be kept during contraction of the tensor network.
+    show_network (bool) : If true, return an np.array of strings to show network.
 
     Returns:
     prob(float): Result of contraction of the tensor network
+    network (np.ndarray) : Array of strings. Visual aid to verify structure of constructed tensor network.
     """
 
     L = 2 * code.code_distance - 1
@@ -171,6 +177,19 @@ def contract_network(code, error_chain, chi, show_network = False):
 
 
 def coordinate_in_error_chain(coord, error_chain, error_coordinates):
+    """
+    Checks if given coordinate lies in the chosen error chain.
+
+    Parameters:
+        coord (Tuple(int, int)) : Coordinate to check for.
+        error_chain (List[Tuple(int,int,int)]) : List of tuples in form (x,y,p). The coordinates (x,y) are 
+                                             the spatial coordinates of qubits lying in the error chain. p represents
+                                             type of error, p = 0,1,2 for X,Z,Y errors respectively.
+        error_coordinates (List[Tuple(int,int)]) : Processed version of error_chain to contain only the spatial coordinates of the qubits.
+
+    Returns:
+        (int) : Dict key value to choose correct tensor-node. 0: No error, 1: X error, 2 : Z error, 3: Y error
+    """
 
     if coord in error_coordinates:
         idx = error_coordinates.index(coord)

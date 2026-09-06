@@ -1,4 +1,3 @@
-import numpy as np
 from typing import Iterable, List, Tuple
 
 PauliEntry = Tuple[int, int, int]          # (x, y, p) with p in {0:X, 1:Z, 2:Y}

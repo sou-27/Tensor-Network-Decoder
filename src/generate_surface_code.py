@@ -27,6 +27,12 @@ class SurfaceCode:
         
 
     def _build_code_capacity_circuit(self) -> stim.Circuit:
+        """
+        Builds a code capacity circuit (no measurement errors )for the input parameters.
+
+        Returns:
+        noisy_circtuit(stim.circuit) : Stim circuit generated from input parameters 
+        """
         d = self.code_distance
         p = self.noise
 
@@ -116,6 +122,9 @@ class SurfaceCode:
     def _create_H(self,error):
         """
             Creates the rank-4 tensor H to be used in the tensor network.
+
+            Parameters:
+            error (Tuple(int, int)) : Stores type of error. (0,0) -> I, (1,0) -> X, (0,1) -> Z, (1,1) -> Y
         
             Returns:
             H (np.ndarray) : Required tensor
@@ -136,6 +145,9 @@ class SurfaceCode:
     def _create_V(self,error):
         """
                 Creates the rank-4 tensor V to be used in the tensor network.
+
+                Parameters:
+                error (Tuple(int, int)) : Stores type of error. (0,0) -> I, (1,0) -> X, (0,1) -> Z, (1,1) -> Y
             
                 Returns:
                 V (np.ndarray) : Required tensor
