@@ -9,7 +9,8 @@ dependencies = [
     "numpy",
     "stim",
     "matplotlib",
-    "ncon"
+    "ncon",
+    "scipy"
 ]
 
 
