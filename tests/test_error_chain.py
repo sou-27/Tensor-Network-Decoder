@@ -7,6 +7,9 @@ from src.coset_error_chains import *
 
 
 def test_error_chain():
+    """
+    Verifies if constructed error chain has same syndrome as the input syndrome.
+    """
     d = 3
     noise_model = "bit-flip"
     noise = 0.3
@@ -35,6 +38,17 @@ def test_error_chain():
 
 
 def circuit_qubits_in_chain_flipped(d,chain):
+    """
+    Takes an input chain, constructs a surface code circuit where the qubits on the input chain are slipped with 100% probability, and returns
+    the detectors that fired in this circuit.
+
+    Parameters:
+    d (int) : Code distance
+    chain (List[Tuple(int, int ,int)]) : Input chain of qubits to be flipped.
+
+    Returns
+    List[Tuple(int, int)] : Syndrome of circuit constructed from the input chain.
+    """
     base_circuit = stim.Circuit.generated(
     "surface_code:unrotated_memory_z",
     distance=d,
