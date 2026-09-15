@@ -89,10 +89,10 @@ class SurfaceCode:
 
         if 'depolar' in self.noise_model:
             model = {
-                (0,0) : 1 - 2*self.noise/3,
+                (0,0) : 1 - self.noise,
                 (1,0) : self.noise/3,
-                (0,1) : 0,
-                (1,1) : 0
+                (0,1) : self.noise/3,
+                (1,1) : self.noise/3
             }
         else:
             model = {
