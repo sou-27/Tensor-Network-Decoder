@@ -15,7 +15,7 @@ class SurfaceCode:
             raise ValueError("noise_model must be 'depolarise' or 'bit-flip'")
         
             
-        self.circuit = self._build_code_capacity_circuit()
+        self.circuit = self._code_capacity_channel()
         self.dem = self.circuit.detector_error_model(decompose_errors=True)
         self.S = self.create_S()
         self.H = self._create_H(error=(0,0))
@@ -24,55 +24,32 @@ class SurfaceCode:
         self.H_Z = self._create_H(error=(0,1))
         self.V = self._create_V(error=(0,0))
 
-        
-
-    def _build_code_capacity_circuit(self) -> stim.Circuit:
-        """
-        Builds a code capacity circuit (no measurement errors )for the input parameters.
-
-        Returns:
-        noisy_circtuit(stim.circuit) : Stim circuit generated from input parameters 
-        """
+    def _code_capacity_channel(self):
         d = self.code_distance
+        noise_model = self.noise_model
         p = self.noise
 
-        if "depolar" in self.noise_model:
-            # Stim natively supports data-qubit-only depolarizing noise before syndrome checks
-            return stim.Circuit.generated(
-                "surface_code:unrotated_memory_z",
-                distance=d,
-                rounds=1,
-                before_round_data_depolarization=p,
-                after_clifford_depolarization=0,
-                after_reset_flip_probability=0,
-                before_measure_flip_probability=0,
-            )
+        if "depolar" in noise_model:
+            channel = "DEPOLARIZE1"
         else:
-            # For bit-flip noise, load noiseless circuit and inject X_ERROR on data qubits
-            base_circuit = stim.Circuit.generated(
-                "surface_code:unrotated_memory_z",
-                distance=d,
-                rounds=1,
-                after_clifford_depolarization=0,
-                after_reset_flip_probability=0,
-                before_measure_flip_probability=0,
-            )
+            channel = "X_ERROR"
 
-            # In Stim's unrotated layout, data qubits sit at coordinates where x % 2 == y % 2
-            coords = base_circuit.get_final_qubit_coordinates()
-            data_qubits = [
-                q for q, (x, y) in coords.items() 
-                if int(x) % 2 == int(y) % 2
-            ]
+        checks = [("X", s) for s in x_checks] + [("Z", s) for s in z_checks]
+        m = len(checks) + 1                      # measurements per pass
+        L = []
+        n = d**2 + (d - 1)**2
 
-            noisy_circuit = stim.Circuit()
-            for instruction in base_circuit:
-                noisy_circuit.append(instruction)
-                # Inject bit-flip noise immediately following data qubit initialization
-                if instruction.name == "R":
-                    noisy_circuit.append("X_ERROR", data_qubits, p)
+        def pass_():
+            L.append("MPP " + " ".join(term(b, s) for b, s in checks)
+                        + " " + term("Z", z_logical))
+        pass_()                                                  # project into code
+        L.append(f"{channel}({p}) " + " ".join(map(str, range(n))))
+        pass_()                                                  # re-measure
+        for k in range(len(checks)):
+            L.append(f"DETECTOR rec[{-2*m + k}] rec[{-m + k}]")
+        L.append(f"OBSERVABLE_INCLUDE(0) rec[{-m-1}] rec[-1]")
+        return stim.Circuit("\n".join(L))
 
-            return noisy_circuit
 
     def model(self, op):
         """
@@ -163,3 +140,7 @@ class SurfaceCode:
 
                         V[i,j,k,l] = self.model(op)
         return V
+
+    def term(basis, supp):
+            return "*".join(f"{basis}{q}" for q in supp)
+    
