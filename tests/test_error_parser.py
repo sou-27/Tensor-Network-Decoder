@@ -7,38 +7,12 @@ from src.parse_syndrome import *
 
 
 
-
-
-
-
-def test_error_chain_in_horizontal_qubits():
-
-
+def test_error_chain_in_data_qubits():
+    """Tests if error chains generated from SurfaceCode actually uses only data qubits"""
     code = SurfaceCode(code_distance=3, noise_model="depolarise", noise=0.1)
     circuit = code.circuit
     dem = code.dem
 
-
-    qubit_coords: Dict[int, Tuple[float, float]] = circuit.get_final_qubit_coordinates()
-
-    horizontal_qubits = []
-    vertical_qubits = []
-
-    # Separate data qubits into horizontal (h-nodes) and vertical (v-nodes)
-    # Data qubits in Stim's unrotated surface code layout have x % 2 == y % 2
-    for q_id, (x, y) in qubit_coords.items():
-        x_int, y_int = int(x), int(y)
-
-        # Skip ancilla check qubits (which have x % 2 != y % 2)
-        if x_int % 2 != y_int % 2:
-            continue
-
-        # - Horizontal edges (h-nodes) connect left-right adjacent checks (x % 2 == 0, y % 2 == 0)
-        # - Vertical edges (v-nodes) connect top-bottom adjacent checks (x % 2 != 0, y % 2 != 0)
-        if y_int % 2 == 0:
-            horizontal_qubits.append((x, y))
-        else:
-            vertical_qubits.append((x, y))
 
     sampler = circuit.compile_detector_sampler()
     detection_events, _ = sampler.sample(shots = 10, separate_observables=True)
@@ -49,10 +23,5 @@ def test_error_chain_in_horizontal_qubits():
         active_detector_coords = get_active_detector_coordinates(event, dem)
         error_chain = get_error_chain(active_detector_coords)
 
-        error_coords = [(int(err[0]), int(err[1])) for err in error_chain]
-        assert(
-            set(error_coords).issubset(set(horizontal_qubits))
-            ),f"error chain not contained in horizontal qubits"
-
-
-
+        for qx, qy, qtype in error_chain:
+            assert qx%2 == qy%2, f"Error chain not contained in data qubits"

@@ -88,6 +88,23 @@ def contract_network(code, error_chain, chi, show_network = False):
     }
 
     V = code.V
+    V_X = code.V_X
+    V_Y = code.V_Y
+    V_Z = code.V_Z
+
+    V_err = {
+            0 : V,
+            1 : V_X,
+            2 : V_Z,
+            3 : V_Y
+        }
+
+    V_err_str = {
+            0 : "V",
+            1 : "Vx",
+            2 : "Vz",
+            3 : "Vy"
+        }
 
     network = np.full((L,L), "", dtype = "<U10")
     error_coordinates = [(err[0], err[1]) for err in error_chain]
@@ -132,7 +149,6 @@ def contract_network(code, error_chain, chi, show_network = False):
                     next_layer.append(S)
 
         else:
-            # V-layer (cannot contain error chain)
             for j in range(L):
                 if j%2 == 0:
                     network[i,j] = "S"
@@ -145,8 +161,10 @@ def contract_network(code, error_chain, chi, show_network = False):
                     else:
                         next_layer.append(S)
                 else:
-                    network[i,j] = "V"
-                    next_layer.append(V)
+                    idx = coordinate_in_error_chain((i,j), error_chain, error_coordinates)
+                    tensor = V_err[idx]
+                    network[i,j] = V_err_str[idx]
+                    next_layer.append(tensor)
 
         state = mps_mpo_contract(state,next_layer, chi)
 
@@ -171,7 +189,7 @@ def contract_network(code, error_chain, chi, show_network = False):
     prob = mps_mps_contract(state, next_layer, chi)
 
     if show_network:
-        return prob, network
+        return prob, network.T
     else:
         return prob
 

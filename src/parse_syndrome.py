@@ -1,5 +1,11 @@
 import stim
-from typing import List, Tuple
+from typing import List, Tuple, Iterable
+
+PauliEntry = Tuple[int, int, int]          # (x, y, p) with p in {0:X, 1:Z, 2:Y}
+Chain = Iterable[PauliEntry]
+
+_TO_BITS   = {0: (1, 0), 1: (0, 1), 2: (1, 1)}
+_FROM_BITS = {(1, 0): 0, (0, 1): 1, (1, 1): 2}
 
 def get_active_detector_coordinates(
     detection_event: List[bool], 
@@ -41,14 +47,23 @@ def get_error_chain(
     
     """
 
-    error_chain = set()
+    x_chain = set()
+    z_chain = set()
+    error_chain = []
 
     for (det_x,det_y) in active_detectors:
-        for i in range(0,int(det_y),2):  
-            path = (int(det_x), i, 0)
-            error_chain.symmetric_difference_update({path})
+        if det_x%2 == 0:
+            for i in range(0,int(det_y),2):  
+                path = (int(det_x), i, 0)
+                x_chain.symmetric_difference_update({path})
+        else:
+            for i in range(0,int(det_x),2):
+                path = (i, int(det_y), 1)
+                z_chain.symmetric_difference_update({path})
 
-    return list(error_chain)
+        error_chain = add_chains(x_chain, z_chain)
+
+    return error_chain
 
 
 def get_logical_bitflips(error_chain):
@@ -63,4 +78,57 @@ def get_logical_bitflips(error_chain):
     num = sum(1 for x, y, p in error_chain if y == 0)
 
     return num%2
+
+
+def add_chains(chain_1, chain_2, *, strict: bool = False) -> List[PauliEntry]:
+    """Multiply two Pauli chains, ignoring global phase.
+
+    Each chain is a list of (x, y, p) with p = 0/1/2 for X/Z/Y. Qubits appearing
+    in both chains are combined by the Pauli product: identical types cancel and
+    vanish from the output, differing types give the remaining third type.
+
+    Returns a canonical (sorted, identity-free) chain, so the operation is
+    commutative and associative on its output form.
+
+    If strict, raise on a qubit listed more than once within a single chain;
+    otherwise such repeats are multiplied in like any other factor.
+    """
+    acc: dict[Tuple[int, int], Tuple[int, int]] = {}
+    if chain_1 == []:
+        return chain_2
+    elif chain_2 == []:
+        return chain_1
+    else:
+        for chain_idx, chain in enumerate((chain_1, chain_2)):
+            seen: set[Tuple[int, int]] = set()
+            for entry in chain:
+                try:
+                    x, y, p = entry
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"chain_{chain_idx + 1}: expected (x, y, p) triples, got {entry!r}"
+                    ) from None
+                if p not in _TO_BITS:
+                    raise ValueError(
+                        f"chain_{chain_idx + 1}: bad Pauli code {p!r} at ({x}, {y}); "
+                        f"expected 0 (X), 1 (Z) or 2 (Y)"
+                    )
+
+                key = (x, y)
+                if strict:
+                    if key in seen:
+                        raise ValueError(
+                            f"chain_{chain_idx + 1}: qubit {key} listed more than once"
+                        )
+                    seen.add(key)
+
+                xb, zb = _TO_BITS[p]
+                ax, az = acc.get(key, (0, 0))
+                acc[key] = (ax ^ xb, az ^ zb)
+
+        return sorted(
+            (x, y, _FROM_BITS[bits])
+            for (x, y), bits in acc.items()
+            if bits != (0, 0)
+        )
 

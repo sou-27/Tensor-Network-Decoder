@@ -2,6 +2,10 @@ import stim
 import numpy as np
 
 
+def term(basis, supp):
+            return "*".join(f"{basis}{q}" for q in supp)
+    
+
 class SurfaceCode:
     """
     Constructs an unrotated surface code memory-Z experiment under a 2D code-capacity noise model.
@@ -13,6 +17,8 @@ class SurfaceCode:
         
         if self.noise_model not in ["depolarise", "depolarize", "bit_flip", "bitflip"]:
             raise ValueError("noise_model must be 'depolarise' or 'bit-flip'")
+
+        self.lattice = self.create_lattice()
         
             
         self.circuit = self._code_capacity_channel()
@@ -23,6 +29,9 @@ class SurfaceCode:
         self.H_Y = self._create_H(error=(1,1))
         self.H_Z = self._create_H(error=(0,1))
         self.V = self._create_V(error=(0,0))
+        self.V_X = self._create_V(error=(1,0))
+        self.V_Y = self._create_V(error=(1,1))
+        self.V_Z = self._create_V(error=(0,1))
 
     def _code_capacity_channel(self):
         d = self.code_distance
@@ -34,22 +43,71 @@ class SurfaceCode:
         else:
             channel = "X_ERROR"
 
+        x_checks = self.get_xchecks()
+        z_checks = self.get_zchecks()
+        z_logical = [k for k in range(d)]
+
+        #x/z_checks is a list of lists: [[[support of stabilizer], (coordinate of correspinding detector)]]
         checks = [("X", s) for s in x_checks] + [("Z", s) for s in z_checks]
         m = len(checks) + 1                      # measurements per pass
         L = []
         n = d**2 + (d - 1)**2
 
         def pass_():
-            L.append("MPP " + " ".join(term(b, s) for b, s in checks)
+            L.append("MPP " + " ".join(term(b, s[0]) for b, s in checks)
                         + " " + term("Z", z_logical))
         pass_()                                                  # project into code
         L.append(f"{channel}({p}) " + " ".join(map(str, range(n))))
-        pass_()                                                  # re-measure
+        pass_()                                            # re-measure
         for k in range(len(checks)):
-            L.append(f"DETECTOR rec[{-2*m + k}] rec[{-m + k}]")
+            L.append(f"DETECTOR({checks[k][1][1][0]},{checks[k][1][1][1]},0) rec[{-2*m + k}] rec[{-m + k}]")
         L.append(f"OBSERVABLE_INCLUDE(0) rec[{-m-1}] rec[-1]")
         return stim.Circuit("\n".join(L))
 
+
+    def create_lattice(self):
+        d = self.code_distance
+
+        coords = []
+
+        for y in range(2*d - 1):
+            for x in range(2*d - 1):
+                if x%2 == y%2:
+                    coords.append((x,y))
+
+        lattice_coords = {coord:i for i,coord in enumerate(coords)}
+
+        return lattice_coords
+
+    def get_xchecks(self):
+        d = self.code_distance
+        lattice_coords = self.lattice
+        xchecks = []
+        coords = lattice_coords.keys()
+        for y in range(2*d - 1):
+            for x in range(2*d - 1):
+                #Vertext operators sit at x%2 != y%2, vertext operators sit at x%2 == 1
+                if x%2 == 1 and y%2 == 0:
+                        detector_coord = (x,y)
+                        neighbors = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
+                        xchecks.append([[lattice_coords[neighbor] for neighbor in neighbors if neighbor in coords], detector_coord])
+
+        return xchecks
+
+    def get_zchecks(self):
+        d = self.code_distance
+        lattice_coords = self.lattice
+        zchecks = []
+        coords = lattice_coords.keys()
+        for y in range(2*d - 1):
+            for x in range(2*d - 1):
+                #Plaquette operators sit at x%2 != y%2, vertext operators sit at x%2 == 0
+                if x%2 == 0 and y%2 == 1:
+                        detector_coord = (x,y)
+                        neighbors = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
+                        zchecks.append([[lattice_coords[neighbor] for neighbor in neighbors if neighbor in coords],detector_coord])
+
+        return zchecks
 
     def model(self, op):
         """
@@ -141,6 +199,3 @@ class SurfaceCode:
                         V[i,j,k,l] = self.model(op)
         return V
 
-    def term(basis, supp):
-            return "*".join(f"{basis}{q}" for q in supp)
-    
