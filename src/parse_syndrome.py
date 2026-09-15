@@ -61,7 +61,7 @@ def get_error_chain(
                 path = (i, int(det_y), 1)
                 z_chain.symmetric_difference_update({path})
 
-        error_chain = add_chains(x_chain, z_chain)
+    error_chain = add_chains(x_chain, z_chain)
 
     return error_chain
 
@@ -75,7 +75,7 @@ def get_logical_bitflips(error_chain):
     Returns:
     (int) :  (# of times error chain crosses L0) modulo 2
     """
-    num = sum(1 for x, y, p in error_chain if y == 0)
+    num = sum(1 for x, y, p in error_chain if y == 0 and p in (0,2))
 
     return num%2
 

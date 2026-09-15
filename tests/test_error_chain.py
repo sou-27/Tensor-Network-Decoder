@@ -60,18 +60,32 @@ def circuit_qubits_in_chain_flipped(d,chain):
 
     # In Stim's unrotated layout, data qubits sit at coordinates where x % 2 == y % 2
     coords = base_circuit.get_final_qubit_coordinates()
-    data_qubits = [
+    data_qubits_x = [
         q for q, (x, y) in coords.items() 
-        if (int(x) % 2 == int(y) % 2) and ((int(x),int(y),0) in chain or (int(x),int(y),2) in chain)
+        if (int(x) % 2 == int(y) % 2) and ((int(x),int(y),0) in chain)
     ]
+
+    data_qubits_z = [
+            q for q, (x, y) in coords.items() 
+            if (int(x) % 2 == int(y) % 2) and ((int(x),int(y),1) in chain)
+        ]
+
+    data_qubits_y = [
+            q for q, (x, y) in coords.items() 
+            if (int(x) % 2 == int(y) % 2) and ((int(x),int(y),2) in chain)
+        ]
 
     noisy_circuit = stim.Circuit()
     for instruction in base_circuit:
         noisy_circuit.append(instruction)
         # Inject bit-flip noise immediately following data qubit initialization
         if instruction.name == "R":
-            for q in data_qubits:
-                noisy_circuit.append("X_ERROR", [q], 1.0)   
+            for q in data_qubits_x:
+                noisy_circuit.append("X_ERROR", [q], 1.0)
+            for q in data_qubits_z:
+                noisy_circuit.append("Z_ERROR", [q], 1.0)   
+            for q in data_qubits_y:
+                noisy_circuit.append("Y_ERROR", [q], 1.0)
 
     sampler = noisy_circuit.compile_detector_sampler()
     dem = noisy_circuit.detector_error_model(decompose_errors=True)
