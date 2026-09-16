@@ -3,12 +3,39 @@ import numpy as np
 
 
 def term(basis, supp):
+            """
+            Returns a string representing pauli operator on given support. Eg. for basis = "X"
+            and supp = [1,2,3,4], returns "X1*X2*X3*X4"
+
+            Parameters:
+            basis (str) : Pauli operator to be used
+            supp (List of integers) : Support of pauli operator
+
+            Returns:
+            String representing given pauli operator.
+            """
             return "*".join(f"{basis}{q}" for q in supp)
     
 
 class SurfaceCode:
     """
-    Constructs an unrotated surface code memory-Z experiment under a 2D code-capacity noise model.
+    Class for storing all relevant data for an unrotated memory-z surface code experiment.
+
+    Parameters:
+    code_distance (int): code distance of surface code
+    noise_model (str) : We support "depolarize" or "bit-flip" noise models.
+    noise (float) : Probability of error.
+
+    Attributes
+    ----------
+
+    code_distance(int)
+    noise_model("depolarize" or "bit-flip")
+    noise(float)
+    lattice(dict[Tuple(lattice coordinates) : Qubit index])
+    circuit(stim.circuit) : Unrotated memory-z surface code circuit with given parameters.
+    dem(stim.dem) : DEM for the generated circuit.
+    S,H,H_X,H_Z,H_Z,V,V_Y,V_Z (np.ndarray) : rank-4 tensors to be used to construct the tensor network for the decoder.
     """
     def __init__(self, code_distance: int, noise_model: str, noise: float):
         self.code_distance = code_distance
@@ -34,6 +61,12 @@ class SurfaceCode:
         self.V_Z = self._create_V(error=(0,1))
 
     def _code_capacity_channel(self):
+        """
+        Constructs stim circuit according to input parameters.
+
+        Returns:
+        Required stim.circuit
+        """
         d = self.code_distance
         noise_model = self.noise_model
         p = self.noise
@@ -45,6 +78,7 @@ class SurfaceCode:
 
         x_checks = self.get_xchecks()
         z_checks = self.get_zchecks()
+        #We set the logical operator to be the string across the lower boundary.
         z_logical = [k for k in range(d)]
 
         #x/z_checks is a list of lists: [[[support of stabilizer], (coordinate of correspinding detector)]]
@@ -66,6 +100,15 @@ class SurfaceCode:
 
 
     def create_lattice(self):
+        """
+        Creates a dictionary to store qubit indices for lattice coordinates on unrotated surface code geometry.
+        We use the same geometry as used by stim.circuits.generated(unrotated_memory_z...)
+        i.e., rough boundaries on the left/right and smooth boundaries on top/bottom. Data qubits sit
+        at (x,y) s.t. x%2 == y%2. We leave lattice coordinates empty where ancillas would sit.
+
+        Returns:
+        lattice_coords (dict{coordinate (tuple) : qubit index (int)})
+        """
         d = self.code_distance
 
         coords = []
@@ -80,13 +123,19 @@ class SurfaceCode:
         return lattice_coords
 
     def get_xchecks(self):
+        """
+        Find all the vertex operators for given surface code
+
+        Returns:
+        xchecks(List[List[Tuple(coordinates of qubits in vertex operator)] , Tuple(coordinates of corresponding detector)])
+        """
         d = self.code_distance
         lattice_coords = self.lattice
         xchecks = []
         coords = lattice_coords.keys()
         for y in range(2*d - 1):
             for x in range(2*d - 1):
-                #Vertext operators sit at x%2 != y%2, vertext operators sit at x%2 == 1
+                #Vertex operators sit at x%2 != y%2, vertext operators sit at x%2 == 1
                 if x%2 == 1 and y%2 == 0:
                         detector_coord = (x,y)
                         neighbors = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
@@ -95,6 +144,12 @@ class SurfaceCode:
         return xchecks
 
     def get_zchecks(self):
+        """
+            Find all the plaquette operators for given surface code
+    
+            Returns:
+            zchecks(List[List[Tuple(coordinates of qubits in plquette operator)] , Tuple(coordinates of corresponding detector)])
+        """
         d = self.code_distance
         lattice_coords = self.lattice
         zchecks = []

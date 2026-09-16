@@ -51,5 +51,36 @@ def main():
     print(f"Error rate = {error_rate}")
     return error_rate
 
+def run_shots(d, noise_model, noise, chi, shots, rng):
+    """
+    Run TN decoder for given number of shots. This involves generating the circuit, sampling it and
+    then decoding it.
+
+    Parameters:
+    d (int) : code distance
+    noise_model (str) : "depolarize" or "bit-flip"
+    noise (float) : error probability
+    chi (int) : Maximum bond dimension to be kept during tensor-network operations
+    shots (int) : Number of shots to be sampled
+    rng (rng object) : Used to seed any random operations.
+
+    Returns:
+    fails (int) : Number of failures of TN decoder.
+    """
+    code = SurfaceCode(d, noise_model, noise)
+
+    stim_seed = int(rng.integers(0, 2**64, dtype=np.uint64))
+
+    sampler = code.circuit.compile_detector_sampler(seed=stim_seed)
+
+    detection_events, observable_flips = sampler.sample(shots, separate_observables=True)
+    
+    predictions = [decoder(code, event, chi) for event in detection_events]
+
+    fails = sum([1 if not predictions[j] == observable_flips[j] else 0 for j in range(shots)])
+
+    return fails
+
+
 if __name__ == "__main__":
     main()
