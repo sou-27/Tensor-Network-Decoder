@@ -51,7 +51,7 @@ def main():
     print(f"Error rate = {error_rate}")
     return error_rate
 
-def run_shots(d, noise_model, noise, chi, shots, rng):
+def run_shots(d, noise_model, noise, chi, shots, rng = None):
     """
     Run TN decoder for given number of shots. This involves generating the circuit, sampling it and
     then decoding it.
@@ -67,6 +67,9 @@ def run_shots(d, noise_model, noise, chi, shots, rng):
     Returns:
     fails (int) : Number of failures of TN decoder.
     """
+    if rng is None:
+        rng = np.random.default_rng()
+    
     code = SurfaceCode(d, noise_model, noise)
 
     stim_seed = int(rng.integers(0, 2**64, dtype=np.uint64))
