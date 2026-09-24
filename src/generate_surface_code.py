@@ -135,7 +135,7 @@ class SurfaceCode:
         coords = lattice_coords.keys()
         for y in range(2*d - 1):
             for x in range(2*d - 1):
-                #Vertex operators sit at x%2 != y%2, vertext operators sit at x%2 == 1
+                #Ancillas sit at x%2 != y%2, vertex operators sit at x%2 == 1
                 if x%2 == 1 and y%2 == 0:
                         detector_coord = (x,y)
                         neighbors = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
@@ -156,7 +156,7 @@ class SurfaceCode:
         coords = lattice_coords.keys()
         for y in range(2*d - 1):
             for x in range(2*d - 1):
-                #Plaquette operators sit at x%2 != y%2, vertext operators sit at x%2 == 0
+                #Ancillas sit at x%2 != y%2, plaquette operators sit at x%2 == 0
                 if x%2 == 0 and y%2 == 1:
                         detector_coord = (x,y)
                         neighbors = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
